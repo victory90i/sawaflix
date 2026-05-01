@@ -38,6 +38,7 @@ export default function ReelsFeed({ videos }: ReelsFeedProps) {
   const [videoStates, setVideoStates] = useState<Map<number, VideoState>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [showMuteButton, setShowMuteButton] = useState(true);
+  const [autoPlayNext, setAutoPlayNext] = useState(true);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);
@@ -273,17 +274,31 @@ export default function ReelsFeed({ videos }: ReelsFeedProps) {
       setCurrentVideoIndex(prev => Math.max(prev - 1, 0));
     }
   };
-
-  // Handle video ended event - loop current video
+//auto play next logic
   const handleVideoEnd = useCallback((index: number) => {
     if (index === currentVideoIndex) {
-      const video = videoRefs.current[index];
-      if (video) {
-        video.currentTime = 0;
-        safePlay(video, index);
+      if (autoPlayNext && currentVideoIndex < videos.length - 1) {
+        // Transition to next video
+        const nextIndex = currentVideoIndex + 1;
+        const nextVideoElement = videoRefs.current[nextIndex];
+        
+        if (nextVideoElement && nextVideoElement.parentElement) {
+          nextVideoElement.parentElement.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      } else {
+        const video = videoRefs.current[index];
+        if (video) {
+          video.currentTime = 0;
+          if (!autoPlayNext) {
+            safePlay(video, index);
+          }
+        }
       }
     }
-  }, [currentVideoIndex]);
+  }, [currentVideoIndex, videos.length, autoPlayNext]);
 
   // Toggle mute for specific video
   const handleToggleMute = (index: number) => {
@@ -329,24 +344,36 @@ export default function ReelsFeed({ videos }: ReelsFeedProps) {
   // Fixed ref callback function
   const setVideoRef = (index: number) => (el: HTMLVideoElement | null) => {
     videoRefs.current[index] = el;
+  };
+
+  // Manage video event listeners
+  useEffect(() => {
+    const refs = videoRefs.current;
     
-    if (el) {
-      // Set initial mute state from videoStates
-      const videoState = videoStates.get(index);
-      if (videoState) {
-        el.muted = videoState.isMuted;
-      }
+    const cleanupFns = refs.map((video, index) => {
+      if (!video) return null;
       
-      // Add event listeners for each video
-      el.addEventListener('ended', () => handleVideoEnd(index));
-      el.addEventListener('canplay', () => {
+      const onEnded = () => handleVideoEnd(index);
+      const onCanPlay = () => {
         const currentState = videoStates.get(index);
         if (index === currentVideoIndex && currentState?.isPlaying) {
-          safePlay(el, index);
+          safePlay(video, index);
         }
-      });
-    }
-  };
+      };
+      
+      video.addEventListener('ended', onEnded);
+      video.addEventListener('canplay', onCanPlay);
+      
+      return () => {
+        video.removeEventListener('ended', onEnded);
+        video.removeEventListener('canplay', onCanPlay);
+      };
+    });
+    
+    return () => {
+      cleanupFns.forEach(cleanup => cleanup?.());
+    };
+  }, [videos.length, handleVideoEnd, currentVideoIndex, videoStates]);
 
   // Clean up event listeners and timeouts
   useEffect(() => {
@@ -519,6 +546,23 @@ export default function ReelsFeed({ videos }: ReelsFeedProps) {
                 </div>
                 
                 <div className="flex items-center space-x-4">
+                  {/* Auto-play Toggle */}
+                  <button 
+                    onClick={() => setAutoPlayNext(!autoPlayNext)}
+                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                      autoPlayNext ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400'
+                    }`}
+                  >
+                    <span>Auto-play</span>
+                    <div className={`w-8 h-4 rounded-full relative transition-colors duration-200 ${
+                      autoPlayNext ? 'bg-red-400' : 'bg-gray-600'
+                    }`}>
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${
+                        autoPlayNext ? 'translate-x-4.5' : 'translate-x-0.5'
+                      }`} />
+                    </div>
+                  </button>
+
                   {/* Play/Pause Button - Only for current video */}
                   {index === currentVideoIndex && (
                     <button 
