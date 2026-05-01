@@ -25,6 +25,7 @@ interface Video {
 
 interface ReelsFeedProps {
   videos: Video[];
+  initialAutoPlay?: boolean;
 }
 
 interface VideoState {
@@ -33,12 +34,12 @@ interface VideoState {
   hasBeenViewed: boolean;
 }
 
-export default function ReelsFeed({ videos }: ReelsFeedProps) {
+export default function ReelsFeed({ videos, initialAutoPlay = true }: ReelsFeedProps) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [videoStates, setVideoStates] = useState<Map<number, VideoState>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [showMuteButton, setShowMuteButton] = useState(true);
-  const [autoPlayNext, setAutoPlayNext] = useState(true);
+  const [autoPlayNext, setAutoPlayNext] = useState(initialAutoPlay);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);

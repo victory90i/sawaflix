@@ -24,7 +24,23 @@ export default async function ReelsPage() {
       producers: video.producer_name ? { name: video.producer_name } : null
     })) || [];
 
-    return <ReelsFeed videos={transformedVideos} />;
+    // Fetch user preferences
+    const { data: { user } } = await supabase.auth.getUser();
+    let initialAutoPlay = true;
+    
+    if (user) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('auto_play_next')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (userData) {
+        initialAutoPlay = userData.auto_play_next ?? true;
+      }
+    }
+    
+    return <ReelsFeed videos={transformedVideos} initialAutoPlay={initialAutoPlay} />;
 
   } catch (error) {
     console.error('Error fetching videos:', error);

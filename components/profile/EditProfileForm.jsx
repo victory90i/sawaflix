@@ -11,7 +11,8 @@ const EditProfileForm = ({ initialData, onSave, isSaving, verificationStatus, re
         bio: '',
         profileImage: '',
         bannerImage: '',
-        socialLinks: []
+        socialLinks: [],
+        autoPlayNext: true
     });
     const [previews, setPreviews] = useState({ profile: '', banner: '' });
     const [uploading, setUploading] = useState({ profile: false, banner: false });
@@ -24,7 +25,8 @@ const EditProfileForm = ({ initialData, onSave, isSaving, verificationStatus, re
                 bio: initialData.bio || '',
                 profileImage: initialData.profileImage || '',
                 bannerImage: initialData.bannerImage || '',
-                socialLinks: initialData.socialLinks || []
+                socialLinks: initialData.socialLinks || [],
+                autoPlayNext: initialData.autoPlayNext ?? true
             });
             setPreviews({
                 profile: initialData.profileImage || '',
@@ -254,6 +256,32 @@ const EditProfileForm = ({ initialData, onSave, isSaving, verificationStatus, re
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Preferences Section */}
+                <div className="bg-[#0f172a] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl p-8 sm:p-12">
+                    <div className="flex items-center gap-2 mb-6">
+                        <Sparkles size={16} className="text-red-500" />
+                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400">Experience Preferences</h3>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-2xl">
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-white">Auto-play Reels</h4>
+                            <p className="text-xs text-zinc-500">Automatically scroll to the next video when the current one ends.</p>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => setFormData(p => ({ ...p, autoPlayNext: !p.autoPlayNext }))}
+                            className={`w-14 h-7 rounded-full relative transition-all duration-300 ${
+                                formData.autoPlayNext ? 'bg-red-600' : 'bg-zinc-800'
+                            }`}
+                        >
+                            <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 ${
+                                formData.autoPlayNext ? 'left-8' : 'left-1'
+                            } shadow-lg`} />
+                        </button>
                     </div>
                 </div>
 
