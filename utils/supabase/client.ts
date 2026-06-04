@@ -1,16 +1,29 @@
+import { createBrowserClient } from '@supabase/ssr'
+
+let client: ReturnType<typeof createBrowserClient> | null = null
+
 export function createClient() {
   if (typeof window === 'undefined') {
-    throw new Error('createClient() must be called from the browser')
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
   }
 
-  // Dynamically require the browser entry so server/middleware bundles
-  // don't try to resolve '@supabase/supabase-js'. This keeps the module
-  // out of the server graph and prevents Next middleware compilation errors.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { createBrowserClient } = require('@supabase/ssr')
+  if (!client) {
+    client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {},
+        auth: {
+          lock: async (_, __, fn) => {
+            return await fn()
+          },
+        },
+      }
+    )
+  }
 
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  return client
 }

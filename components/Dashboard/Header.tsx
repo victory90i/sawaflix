@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Search, Bell, User, Settings, ChevronDown } from 'lucide-react';
+import { Menu, X, Search, Bell, User, Settings, ChevronDown, ArrowLeft, CheckCheck } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,9 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { handleSignOut } from '../../app/(auth)/actions'; 
 import SawaflixLogo from '../SawaflixLogo';
 import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { NotificationDropdown } from '../notifications/NotificationDropdown';
+import NotificationPanel from './NotificationPanel';
 
 type UserProfileData = {
   username: string | null;
@@ -25,16 +28,22 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Use admin notifications only if we are in admin mode (indicated by hideSearch)
-  const notificationContext = useAdminNotifications();
-  const { notifications, unreadCount, markRead, markAllRead } = hideSearch ? notificationContext : { notifications: [], unreadCount: 0, markRead: () => {}, markAllRead: () => {} };
+  // Notifications logic
+  const adminNotificationContext = useAdminNotifications();
+  const userNotificationContext = useNotifications();
+  
+  const { notifications, unreadCount, markRead, markAllRead, handleNotificationClick } = hideSearch 
+    ? { ...adminNotificationContext, handleNotificationClick: () => {} } 
+    : userNotificationContext;
+
 
   const router = useRouter();
 
   useEffect(() => {
     const fetchUserData = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       setCurrentUser(user);
 
       if (user) {
@@ -77,6 +86,7 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
           </button>
 
           <div className="flex items-center space-x-3 group">
+            <div className="hidden sm:block"></div>
             <Link href="/dashboard" className="flex items-center gap-3">
               <SawaflixLogo />
             </Link>
@@ -94,7 +104,7 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
                 onFocus={() => {
                   document.getElementById('discover-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                placeholder="Search titles, people, genres..."
+                placeholder="Search..."
                 className="w-full pl-10 pr-4 py-1.5 bg-black border border-white/40 rounded-sm
                            text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-1 
                            focus:ring-white focus:border-white transition-all duration-300
@@ -115,83 +125,56 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
             </button>
           )}
 
-          {/* User Notifications */}
-          {!hideSearch && (
-            <button 
-              onClick={() => window.location.href = '/dashboard/notification'}
-              className="relative p-2.5 rounded-xl cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all relative group"
+              aria-label="Notifications"
             >
-              <Bell size={18} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full animate-pulse shadow-lg shadow-red-600/20" />
-            </button>
-          )}
-
-          {/* Admin Notifications Bell */}
-          {hideSearch && (
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all relative"
-                aria-label="Notifications"
-              >
-                <Bell size={20} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-600/20" />
-                )}
-              </button>
-
-              {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#0B0E14]/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 py-3 z-50 animate-in fade-in slide-in-from-top-2">
-                  <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
-                    <h3 className="text-xs font-black text-white uppercase tracking-widest">Notifications</h3>
-                    <button 
-                      onClick={markAllRead}
-                      className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase tracking-widest"
-                    >
-                      Mark all read
-                    </button>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto scrollbar-none">
-                    {notifications.length === 0 ? (
-                      <div className="px-5 py-10 text-center text-gray-500 text-xs font-medium">
-                        No notifications yet
-                      </div>
-                    ) : (notifications.map(n => (
-                        <div 
-                          key={n.id} 
-                          onClick={() => {
-                            if (!n.read) markRead(n.id);
-                          }}
-                          className={`px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group ${!n.read ? 'bg-red-600/5' : ''}`}
-                        >
-                          <div className="flex gap-4">
-                            <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
-                              n.type === 'approved' ? 'bg-green-500' : 
-                              n.type === 'rejected' ? 'bg-red-500' : 
-                              n.type === 'new_submission' ? 'bg-yellow-500' : 'bg-blue-500'
-                            }`} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-bold leading-tight mb-1 ${!n.read ? 'text-white' : 'text-gray-400'}`}>
-                                {n.title}
-                              </p>
-                              <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{n.message}</p>
-                              <p className="text-[9px] text-gray-600 mt-2 font-bold uppercase tracking-tighter">
-                                {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+              <Bell size={20} className="group-hover:scale-110 transition-transform" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] px-1 bg-red-600 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-lg shadow-red-600/20 animate-in zoom-in duration-300">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               )}
-            </div>
-          )}
+            </button>
+
+            {showNotifications && (
+              <NotificationPanel 
+                title={hideSearch ? "Admin Alerts" : "Notifications"}
+                subtitle={hideSearch ? `${unreadCount} pending actions` : `${unreadCount} new updates`}
+                notifications={notifications.slice(0, 15).map(n => ({
+                  id: n.id,
+                  type: n.type,
+                  title: n.title,
+                  message: n.message,
+                  read: n.read,
+                  timestamp: (n as any).createdAt || (n as any).timestamp,
+                  thumbnail: (n as any).thumbnail,
+                  contentId: (n as any).contentId,
+                  category: (n as any).category
+                }))}
+                unreadCount={unreadCount}
+                onMarkAllRead={markAllRead}
+                onClose={() => setShowNotifications(false)}
+                onItemClick={(id) => {
+                  const notification = notifications.find(n => n.id === id);
+                  if (notification) {
+                    handleNotificationClick(notification as any);
+                  }
+                  setShowNotifications(false);
+                }}
+                accentColor={hideSearch ? "red" : "white"}
+                viewAllHref={hideSearch ? undefined : "/dashboard/notification"}
+              />
+            )}
+          </div>
 
           <Link href="/dashboard/settings" className="hidden sm:block p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer">
             <Settings size={18} />
           </Link>
+
 
           <div className="relative">
             <button
@@ -227,7 +210,7 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
                   <p className="text-xs text-gray-400">{currentUser?.email || 'N/A'}</p>
                 </div>
                 <Link href="/dashboard/edit-profile" className="block px-4 py-2 text-sm text-zinc-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  Update profile
+                  Update Profile
                 </Link>
                 <a href="#" className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
                   Help & Support
@@ -280,6 +263,15 @@ const Header = ({ sidebarOpen, toggleSidebar, hideSearch }: { sidebarOpen: boole
         <div
           className="fixed inset-0 z-40"
           onClick={() => setShowProfileMenu(false)}
+        />
+      )}
+
+      {showNotifications && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setShowNotifications(false);
+          }}
         />
       )}
     </header>

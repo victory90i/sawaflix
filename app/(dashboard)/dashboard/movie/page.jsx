@@ -26,6 +26,18 @@ export default function MovieStreamingSite() {
       mustWatch: mockData.slice(20, 25)
     };
     setData(processedData);
+
+    // Check for id in URL to auto-play
+    const searchParams = new URLSearchParams(window.location.search);
+    const movieId = searchParams.get('id');
+    if (movieId) {
+      // Find movie in mockData or theoretically fetch from Supabase
+      // For now, let's try to find it in mockData by title or id if it exists
+      const movie = mockData.find(m => m.id === movieId || m.title === movieId);
+      if (movie) {
+        handlePlay(movie);
+      }
+    }
   }, []);
 
   const showToast = (message) => {

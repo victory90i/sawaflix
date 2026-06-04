@@ -88,7 +88,7 @@ export default function EditContentPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`https://sawaflix-backend.onrender.com/api/content/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://sawaflix-backend.onrender.com'}/api/content/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

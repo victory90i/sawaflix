@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 export default function Hero() {
+
   return (
     <section
       id="home"
@@ -43,14 +44,13 @@ export default function Hero() {
 
           {/* Main Headline - Further Refined Scaling */}
           <h1 className="text-[clamp(2rem,7vw,3.5rem)] leading-[1.1] font-black tracking-wide text-white" style={{ wordSpacing: '0.15em' }}>
-            Unlimited Culture.<br className="hidden md:block" />
-            Infinite Stories.
+            Discover the Heart of<br className="hidden md:block" />
+            African Entertainment
           </h1>
 
           {/* Description text - Compact & Elegant */}
           <p className="max-w-xl mx-auto text-[clamp(0.9rem,1.5vw,1.05rem)] text-gray-300 font-medium leading-relaxed px-4 md:px-0 opacity-75">
-            Discover the rich heritage of Africa through curated music, cinema, and traditions.
-            A platform dedicated to keeping our stories alive.
+            Stream authentic African music, traditions, and cultural content from across the continent.
           </p>
 
           {/* Call to Action - Compact & Professional */}

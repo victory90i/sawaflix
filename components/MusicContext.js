@@ -23,6 +23,7 @@ export const MusicProvider = ({ children }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+  const [isVideoMode, setIsVideoMode] = useState(false);
 
   // Reference to the ReactPlayer instance (set by BottomPlayer)
   const playerRef = useRef(null);
@@ -70,6 +71,11 @@ export const MusicProvider = ({ children }) => {
     }
   }, []);
 
+  const closePlayer = useCallback(() => {
+    setCurrentTrack(null);
+    setIsPlaying(false);
+  }, []);
+
   const value = {
     currentTrack,
     isPlaying,
@@ -88,6 +94,11 @@ export const MusicProvider = ({ children }) => {
     togglePlay,
     playNext,
     playPrev,
+    isVideoMode,
+    setIsVideoMode,
+    closePlayer,
+    currentIndex,
+    setIsPlaying,
   };
 
   return (

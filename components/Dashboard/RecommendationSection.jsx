@@ -3,12 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import FavoriteButton from '../common/FavoriteButton';
 
 const RecommendationCard = ({ rec, index }) => (
   <div className="group relative bg-gradient-to-br from-gray-900 to-gray-950 rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10">
     {/* Image Placeholder */}
     <div className={`h-40 bg-gradient-to-br ${rec.gradient} relative overflow-hidden`}>
       <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-white transition-opacity duration-300" />
+      <FavoriteButton 
+        content={rec} 
+        className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity" 
+      />
     </div>
 
     {/* Content */}

@@ -63,7 +63,10 @@ function LoginContent() {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            
           },
+          scope:'https://www.googleapi.com/auth/youtube.force-ssl'
+
         },
       });
 
@@ -76,6 +79,33 @@ function LoginContent() {
       setIsGoogleLoading(false);
     }
   };
+
+  useEffect(() => { 
+    const syncTokens = async()=>{
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if(session?.provider_token){
+        console.log("Syncing google tokens...")
+        try{await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ""}/api/sync-tokens`, {
+          method: 'POST',
+          headers: { 
+            Authorization: `Bearer ${session.provider_token}`,
+          'Content-Type': 'application/json' },
+          body:JSON.stringify({
+            provider_token: session.provider_token,
+            provider_refresh_token: session.provider_refresh_token,
+          }),
+        },
+      
+      );
+    }catch(err){
+          console.error("Failed to sync tokens:", err);
+      }
+    }
+      }
+
+    syncTokens()
+  }, [])
 
   // Removed auto-redirect to allow users to see the login page even if logged in
   // Check if user is already logged in (optional check, but don't force redirect now)

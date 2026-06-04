@@ -3,13 +3,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { PlaybackRestriction } from '@/services/playbackService';
+
 interface YouTubePlayerProps {
     videoId: string;
     isActive: boolean;
     isMuted: boolean;
     isPaused?: boolean;
+    restriction?: PlaybackRestriction;
     onProgress?: (progress: number, timeLeft: string, currentTime: number, duration: number) => void;
     onPlayerReady?: (player: YT.Player) => void;
+    onRestrictionReached?: () => void;
 }
 
 declare global {
@@ -25,8 +29,10 @@ export function YouTubePlayer({
     isActive,
     isMuted,
     isPaused = false,
+    restriction,
     onProgress,
-    onPlayerReady
+    onPlayerReady,
+    onRestrictionReached
 }: YouTubePlayerProps) {
     const playerRef = useRef<YT.Player | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -169,6 +175,17 @@ export function YouTubePlayer({
                 if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
                     const currentTime = playerRef.current.getCurrentTime();
                     const duration = playerRef.current.getDuration();
+                    
+                    // Enforce Playback Restriction (Preview Limit)
+                    if (restriction?.mustPay && restriction.limitSeconds > 0) {
+                        if (currentTime >= restriction.limitSeconds) {
+                            playerRef.current.pauseVideo();
+                            playerRef.current.seekTo(restriction.limitSeconds, true);
+                            onRestrictionReached?.();
+                            return;
+                        }
+                    }
+
                     if (duration > 0) {
                         const remaining = Math.max(0, Math.floor(duration - currentTime));
                         const mins = Math.floor(remaining / 60);
@@ -183,7 +200,7 @@ export function YouTubePlayer({
         return () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [isActive, isPlayerReady, onProgress]);
+    }, [isActive, isPlayerReady, onProgress, restriction, onRestrictionReached]);
 
     return (
         <div className="w-full h-full relative bg-black">

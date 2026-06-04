@@ -14,56 +14,74 @@ export async function signInWithPassword(formData) {
       return { error: 'Email and password are required' };
     }
 
-    const supabase = await createClient();
+    const isDev = process.env.NODE_ENV === 'development';
+    const fallbackUrl = isDev ? 'http://localhost:5000' : 'https://sawaflix-backend.onrender.com';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
+    const cleanBackendUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.toString().trim(),
-      password: password.toString(),
+    console.log(`🟡 Logging in via backend: ${email} at ${cleanBackendUrl}`);
+
+    const res = await fetch(`${cleanBackendUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email.toString().trim(),
+        password: password.toString()
+      }),
     });
 
-    if (error) {
-      console.error('🔴 Sign in error:', error.message);
-
-      // User-friendly error messages
-      let userMessage = error.message;
-      if (error.message.includes('Invalid login credentials')) {
-        userMessage = 'Invalid email or password. Please try again.';
-      } else if (error.message.includes('Email not confirmed')) {
-        userMessage = 'Please confirm your email address before logging in.';
-      } else if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
-        userMessage = 'Too many attempts. Please try again in a few minutes.';
-      } else if (error.message.includes('User not found')) {
-        userMessage = 'No account found with this email address.';
-      }
-
-      return { error: userMessage };
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error('🔴 Backend returned non-JSON response. Status:', res.status);
+      return { error: 'Could not reach the authentication service. Please try again later.' };
     }
 
-    if (!data.user) {
-      return { error: 'Authentication failed. Please try again.' };
+    const result = await res.json();
+
+    if (!res.ok) {
+      console.error('🔴 Backend login error:', result);
+      return { error: result.error || result.message || 'Invalid email or password. Please try again.' };
     }
 
-    // Fetch user role from public.users table
-    const { data: userData, error: roleError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
+    const { session, role, isAuthorize } = result;
 
-    const role = userData?.role || 'client';
-    console.log('🟢 Login successful, role:', role);
-    
+    if (!session?.access_token || !session?.refresh_token) {
+      return { error: 'Authentication failed. No session returned.' };
+    }
+
+    const supabase = await createClient();
+
+    // Set the session in Supabase client
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    if (sessionError) {
+      console.error('🔴 Supabase setSession error:', sessionError.message);
+      return { error: 'Failed to establish session. Please try again.' };
+    }
+
+    console.log('🟢 Login successful, role:', role, 'isAuthorize:', isAuthorize);
+
     // Revalidate relevant paths
     revalidatePath('/dashboard');
     if (role === 'admin') revalidatePath('/admin');
-    
-    // Return success to client so it can do a router.push()
+
+    // Determine redirect path
+    let redirectTo = role === 'admin' ? '/admin' : '/dashboard';
+
+    // If not authorized, redirect to waiting list
+    if (isAuthorize === false) {
+      redirectTo = '/waiting-list';
+    }
+
     return {
       success: true,
       message: 'Login successful',
-      user: data.user,
       role: role,
-      redirectTo: role === 'admin' ? '/admin' : '/dashboard'
+      isAuthorize: isAuthorize,
+      redirectTo: redirectTo
     };
 
   } catch (error) {
@@ -373,9 +391,9 @@ export async function checkAuth() {
         .single();
       role = userData?.role || 'client';
     }
-    
-    return { 
-      authenticated: !!session, 
+
+    return {
+      authenticated: !!session,
       session,
       user: session?.user,
       role: role

@@ -200,6 +200,19 @@ export default function UnifiedUploadPage() {
     }
     
     setLoading(true);
+    
+    // File size validation for direct upload fallback
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+    const MAX_OTHER_SIZE = 50 * 1024 * 1024;  // 50MB
+    const isVideoFile = mediaFile?.type?.startsWith('video');
+    const sizeLimit = isVideoFile ? MAX_VIDEO_SIZE : MAX_OTHER_SIZE;
+
+    if (mediaFile && mediaFile.size > sizeLimit) {
+      showToast("error", `File is too large (${(mediaFile.size / (1024 * 1024)).toFixed(1)}MB). Max allowed is ${sizeLimit / (1024 * 1024)}MB.`);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { createClient } = require('@/utils/supabase/client');
       const supabase = createClient();
@@ -232,13 +245,82 @@ export default function UnifiedUploadPage() {
       // We omit thumbnail here unless specifically required to prevent Multer "Unexpected field" crashes
 
       // Send POST request to the correct category endpoint
-      const res = await fetch(`${BACKEND_URL}${endpointPath}`, {
-        method: "POST",
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData,
-      });
+      let res;
+      try {
+        res = await fetch(`${BACKEND_URL}${endpointPath}`, {
+          method: "POST",
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: formData,
+        });
+      } catch (fetchErr) {
+        console.warn("[Upload] Backend unreachable, falling back to Supabase direct upload", fetchErr);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated for fallback upload");
+
+        // 1. Upload Media File
+        let mediaUrl = null;
+        if (mediaFile) {
+          const ext = mediaFile.name.split('.').pop();
+          const path = `${user.id}/${isVideo ? 'movies' : 'media'}/${Date.now()}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from('videos')
+            .upload(path, mediaFile);
+          if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(path);
+          mediaUrl = publicUrl;
+        }
+
+        // 2. Upload Thumbnail (optional)
+        let thumbnailUrl = null;
+        if (thumbnail) {
+          const ext = thumbnail.name.split('.').pop();
+          const path = `${user.id}/thumbnails/${Date.now()}.${ext}`;
+          const { error: thumbError } = await supabase.storage
+            .from('videos')
+            .upload(path, thumbnail);
+          if (!thumbError) {
+            const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(path);
+            thumbnailUrl = publicUrl;
+          }
+        }
+
+        // 3. Insert into database based on category
+        if (isVideo) {
+          const { error: dbError } = await supabase
+            .from('movies')
+            .insert({
+              uploaded_by: user.id,
+              title: form.title,
+              description: form.description,
+              video_url: mediaUrl,
+              thumbnail: thumbnailUrl,
+              is_featured: false,
+              created_at: new Date().toISOString()
+            });
+          if (dbError) throw dbError;
+        } else {
+          const { error: dbError } = await supabase
+            .from('content')
+            .insert({
+              creator_id: user.id,
+              title: form.title,
+              description: form.description,
+              media_url: mediaUrl,
+              cover_url: thumbnailUrl,
+              category: 'general',
+              tags: tags.split(',').map(t => t.trim()),
+              visibility: 'public',
+              status: 'approved',
+              created_at: new Date().toISOString()
+            });
+          if (dbError) throw dbError;
+        }
+
+        res = { ok: true, json: async () => ({ success: true }) };
+      }
 
       if (!res.ok) {
         let errMsg = `Upload failed with status: ${res.status}`;

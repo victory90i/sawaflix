@@ -4,9 +4,12 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { signInWithPassword } from '../(auth)/actions';
+import { useTranslation } from 'react-i18next';
+
 
 const LandingPage = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -47,7 +50,10 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="min-h-screen lg:flex relative">
+      {/* Floating Language Toggle Removed */}
+      <div className="absolute top-6 right-6 z-[100]">
+      </div>
 
       {/* Left Side - Only for Desktop */}
       <div className="hidden lg:flex w-1/2 h-[100vh] relative">
@@ -67,7 +73,7 @@ const LandingPage = () => {
             <div className="mb-12">
               <p className='bg-red-600 w-[100px] text-center rounded-md'>SawaFlix ✨</p>
               <h2 className="text-5xl font-bold text-white mb-6">
-                Welcome to Cameroon's Premier Entertainment Hub
+                {t("landing.welcome_title")}
               </h2>
 
               <div className="space-y-4 text-gray-200 leading-relaxed text-lg">
@@ -78,7 +84,7 @@ const LandingPage = () => {
                 </p> */}
 
                 <p className=" text-white ">
-                  Stream unlimited content and stay connected with Cameroon's dynamic entertainment scene.
+                  {t("landing.welcome_subtitle")}
                 </p>
               </div>
             </div>
@@ -87,25 +93,25 @@ const LandingPage = () => {
                 onClick={() => router.push('/login')}
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-5 px-8 rounded-xl transition-all duration-300 text-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
-                Login
+                {t("common.login")}
               </button>
               <button 
                 onClick={() => router.push('/sign-up')}
                 className="w-full bg-white hover:bg-white/10 text-black cursor-pointer font-bold py-5 px-8 rounded-xl transition-all duration-300 text-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
-                Sign Up
+                {t("common.sign_up")}
               </button>
             </div>
             <div className="mt-12 text-center">
               <div className="bg-white bg-opacity-90 border border-white rounded-xl p-6">
                 <p className="text-sm text-gray-700 mb-2">
-                  🎬 Over 1,000+ Cameroonian Movies & Shows
+                  🎬 {t("landing.movies_count")}
                 </p>
                 <p className="text-sm text-gray-700 mb-2">
-                  🎵 Unlimited Access to Local Music
+                  🎵 {t("landing.music_access")}
                 </p>
                 <p className="text-sm text-gray-700">
-                  🌟 Join 50,000+ users enjoying premium content
+                  🌟 {t("landing.users_count")}
                 </p>
               </div>
             </div>
@@ -123,15 +129,18 @@ const LandingPage = () => {
 
           {/* Mobile Header and Buttons at Top */}
           <div className="absolute top-0 left-0 right-0 z-20 px-6 pt-12 pb-6">
-            <div className="flex items-center mb-2">
-              <button className="flex items-center">
-                <div className="w-6 h-6 bg-yellow-400 rounded mr-2 flex items-center justify-center">
-                  <div className="w-0 h-0 border-l-[4px] border-l-black border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent ml-0.5"></div>
-                </div>
-                <svg className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <button className="flex items-center">
+                  <div className="w-6 h-6 bg-yellow-400 rounded mr-2 flex items-center justify-center">
+                    <div className="w-0 h-0 border-l-[4px] border-l-black border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent ml-0.5"></div>
+                  </div>
+                  <svg className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+              </div>
+              <div />
             </div>
 
             {/* Buttons at top */}
@@ -140,7 +149,7 @@ const LandingPage = () => {
                 onClick={() => router.push('/dashboard')}
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
               >
-                Get Started
+                {t("common.get_started")}
               </button>
 
             </div>
@@ -279,7 +288,10 @@ const LandingPage = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSignIn}>
+        <form onSubmit={handleSignIn} className="space-y-6">
+          <div className="mb-8">
+            {/* LanguageToggle Removed */}
+          </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Email</label>
             <input
@@ -287,7 +299,7 @@ const LandingPage = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              placeholder={t("landing.email_placeholder")}
               className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-medium"
             />
           </div>
@@ -298,7 +310,7 @@ const LandingPage = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t("landing.password_placeholder")}
               className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-medium"
             />
           </div>
@@ -311,9 +323,9 @@ const LandingPage = () => {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 bg-gray-900 border-gray-800 rounded checked:bg-red-600 transition-all cursor-pointer"
               />
-              <span>Remember me</span>
+              <span>{t("landing.remember_me")}</span>
             </label>
-            <button type="button" className="text-red-700 hover:text-red-600 font-bold">Forgot password?</button>
+            <button type="button" className="text-red-700 hover:text-red-600 font-bold">{t("landing.forgot_password")}</button>
           </div>
 
           <button
@@ -321,7 +333,7 @@ const LandingPage = () => {
             disabled={loading}
             className="w-full py-5 bg-red-600 hover:bg-red-700 text-white font-black text-xl rounded-2xl shadow-xl shadow-red-900/20 transition-all transform active:scale-95 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? t("landing.signing_in") : t("common.sign_in")}
           </button>
         </form>
         </div>

@@ -161,6 +161,16 @@ export default function PostMusicPage() {
             return;
         }
 
+        // File size check (e.g., 50MB limit for fallback)
+        const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+        if (mediaFiles.audio && mediaFiles.audio.size > MAX_SIZE) {
+            setMessage({ 
+                type: 'error', 
+                text: `Audio file is too large (${(mediaFiles.audio.size / (1024 * 1024)).toFixed(1)}MB). Max allowed is 50MB.` 
+            });
+            return;
+        }
+
         setLoading(true);
         setMessage(null);
 
@@ -177,16 +187,69 @@ export default function PostMusicPage() {
 
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
-            const { data: { user } } = await supabase.auth.getUser(); // Add this line to avoid Next.js warnings
+            const { data: { user } } = await supabase.auth.getUser();
             const token = session?.access_token;
 
-            const res = await fetch(`${BACKEND_URL}/api/content/music/upload`, {
-                method: 'POST',
-                headers: {
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
-                body: payload,
-            });
+            let res;
+            try {
+                res = await fetch(`${BACKEND_URL}/api/content/music/upload`, {
+                    method: 'POST',
+                    headers: {
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: payload,
+                });
+            } catch (fetchErr) {
+                console.warn("[Upload] Backend unreachable, falling back to Supabase direct upload", fetchErr);
+                
+                // --- Supabase Fallback Logic ---
+                if (!user) throw new Error("User not authenticated for fallback upload");
+
+                // 1. Upload Audio
+                const audioExt = mediaFiles.audio.name.split('.').pop();
+                const audioPath = `${user.id}/music/${Date.now()}.${audioExt}`;
+                const { data: audioData, error: audioError } = await supabase.storage
+                    .from('videos')
+                    .upload(audioPath, mediaFiles.audio);
+                if (audioError) throw audioError;
+
+                // 2. Upload Cover (optional)
+                let coverUrl = null;
+                if (mediaFiles.cover) {
+                    const coverExt = mediaFiles.cover.name.split('.').pop();
+                    const coverPath = `${user.id}/covers/${Date.now()}.${coverExt}`;
+                    const { data: coverData, error: coverError } = await supabase.storage
+                        .from('videos')
+                        .upload(coverPath, mediaFiles.cover);
+                    if (!coverError) {
+                        const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(coverPath);
+                        coverUrl = publicUrl;
+                    }
+                }
+
+                const { data: { publicUrl: audioUrl } } = supabase.storage.from('videos').getPublicUrl(audioPath);
+
+                // 3. Insert into database
+                const { error: dbError } = await supabase
+                    .from('content')
+                    .insert({
+                        creator_id: user.id,
+                        title: formData.title,
+                        category: 'music',
+                        genre: formData.genre,
+                        description: formData.description,
+                        media_url: audioUrl,
+                        cover_url: coverUrl,
+                        tags: formData.tags.split(',').map(t => t.trim()),
+                        visibility: 'public',
+                        status: 'approved'
+                    });
+
+                if (dbError) throw dbError;
+
+                // Simulate successful response for UI consistency
+                res = { ok: true, json: async () => ({ success: true }) };
+            }
 
             const result = await res.json();
 
@@ -198,7 +261,8 @@ export default function PostMusicPage() {
                 setMessage({ type: 'error', text: result.error || 'Upload failed' });
             }
         } catch (err) {
-            setMessage({ type: 'error', text: 'Network connection error' });
+            console.error("[Upload Error]", err);
+            setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Network connection error' });
         } finally {
             setLoading(false);
         }

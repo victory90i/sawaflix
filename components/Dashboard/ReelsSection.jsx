@@ -103,6 +103,8 @@ const ReelCard = ({ reel, index }) => {
   );
 };
 
+}
+
 export default function ReelsSection() {
   const [reels, setReels] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');

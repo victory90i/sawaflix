@@ -1,0 +1,16 @@
+{
+  "name": "SawaFlix Premium",
+  "short_name": "SawaFlix",
+  "description": "Experience the best of Cameroon entertainment.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#0B0E14",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

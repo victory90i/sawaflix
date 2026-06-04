@@ -2,7 +2,8 @@
 import { createClient } from '../../../../utils/supabase/server';
 import ReelsFeed from '../../../../components/reelsFeed';
 
-export default async function ReelsPage() {
+export default async function ReelsPage({ searchParams }: { searchParams: { id?: string } }) {
+  const initialVideoId = searchParams?.id;
   const supabase = await createClient();
   
   try {
@@ -24,7 +25,7 @@ export default async function ReelsPage() {
       producers: video.producer_name ? { name: video.producer_name } : null
     })) || [];
 
-    return <ReelsFeed videos={transformedVideos} />;
+    return <ReelsFeed videos={transformedVideos} initialVideoId={initialVideoId} />;
 
   } catch (error) {
     console.error('Error fetching videos:', error);

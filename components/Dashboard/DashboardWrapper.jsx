@@ -9,12 +9,16 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 
 import { MusicProvider } from '../MusicContext';
+import { NotificationProvider } from '../../contexts/NotificationContext';
+import { FavoriteProvider } from '../../contexts/FavoriteContext';
 import BottomPlayer from '../BottomPlayer';
+import MobileBottomNav from './MobileBottomNav';
 
 const DashboardWrapper = ({ children }) => {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState('none');
+  const [userRole, setUserRole] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
 
   React.useEffect(() => {
@@ -23,22 +27,42 @@ const DashboardWrapper = ({ children }) => {
             const { createClient } = require('../../utils/supabase/client');
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
-            const { data: { user } } = await supabase.auth.getUser(); 
+            const user = session?.user;
             const token = session?.access_token;
             
             // 1. Try API first
             let apiData = null;
             try {
+                console.log("Fetching profile from:", `${BACKEND_URL}/api/creator/profile`);
                 const visitorId = localStorage.getItem('sawaflix_visitor_id');
-                const res = await fetch(`${BACKEND_URL}/api/creator/profile`, {
-                    headers: {
-                        ...(visitorId ? { 'x-visitor-id': visitorId } : {}),
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                
+                let res;
+                let retryCount = 0;
+                const maxRetries = 2;
+                
+                while (retryCount <= maxRetries) {
+                    try {
+                        res = await fetch(`${BACKEND_URL}/api/creator/profile`, {
+                            headers: {
+                                ...(visitorId ? { 'x-visitor-id': visitorId } : {}),
+                                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                            }
+                        });
+                        break; // Success!
+                    } catch (fetchErr) {
+                        retryCount++;
+                        if (retryCount > maxRetries) throw fetchErr;
+                        console.warn(`Fetch retry ${retryCount}/${maxRetries}...`);
+                        await new Promise(r => setTimeout(r, 1000 * retryCount));
                     }
-                });
-                if (res.ok) apiData = await res.json();
+                }
+                if (res.ok) {
+                    apiData = await res.json();
+                } else {
+                    console.warn("Backend profile fetch returned non-ok status:", res.status);
+                }
             } catch (apiErr) {
-                console.error("API check failed:", apiErr);
+                console.error("API check failed (likely network error or timeout):", apiErr);
             }
 
             // 2. Always fetch Supabase profile as source of truth for permissions
@@ -79,8 +103,12 @@ const DashboardWrapper = ({ children }) => {
                 ? 'approved'
                 : (statusFromSupabase || statusFromApi || 'none');
 
+            // Get user role from Supabase profile
+            const userRoleFromDB = supabaseProfile?.role || null;
+
             setUserProfile(finalProfile);
             setVerificationStatus(finalStatus);
+            setUserRole(userRoleFromDB);
 
         } catch (err) {
             console.error("Error checking creator status:", err);
@@ -101,7 +129,9 @@ const DashboardWrapper = ({ children }) => {
 
   return (
     <MusicProvider>
-      <div className="min-h-screen bg-[#0B0E14] relative overflow-hidden">
+      <NotificationProvider>
+        <FavoriteProvider>
+        <div className="min-h-screen bg-[#0B0E14] relative overflow-hidden">
         {/* Texture overlay without colored glows */}
         <div className="fixed inset-0 z-0 pointer-events-none">
            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] opacity-[0.03] mix-blend-overlay" />
@@ -139,7 +169,8 @@ const DashboardWrapper = ({ children }) => {
           >
             <LeftSidebar 
               onNavigate={closeSidebar} 
-              verificationStatus={verificationStatus} 
+              verificationStatus={verificationStatus}
+              userRole={userRole}
               userProfile={userProfile} 
             />
           </aside>
@@ -169,6 +200,9 @@ const DashboardWrapper = ({ children }) => {
         {/* Persistent Player */}
         <BottomPlayer />
 
+        {/* Mobile Navigation */}
+        <MobileBottomNav />
+
         <style jsx global>{`
           /* Hide scrollbars */
           .scrollbar-none::-webkit-scrollbar {
@@ -186,6 +220,8 @@ const DashboardWrapper = ({ children }) => {
           }
         `}</style>
       </div>
+        </FavoriteProvider>
+      </NotificationProvider>
     </MusicProvider>
   );
 };

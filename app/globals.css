@@ -64,6 +64,30 @@ body {
   display: none;
 }
 
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 html {
   scroll-behavior: smooth;
+}
+
+/* Custom NProgress styling for TopLoader to place it right under the nav */
+#nprogress .bar {
+  top: 64px !important;
+  height: 3px !important;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.8) !important;
 }

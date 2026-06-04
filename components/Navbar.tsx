@@ -26,6 +26,7 @@ export default function Navbar() {
     setIsScrolled(latest > 50);
   });
 
+
   // Updated hrefs to match section IDs for scrolling
   const navLinks = [
     { name: "Home", href: "#home" },
@@ -77,6 +78,7 @@ export default function Navbar() {
 
           {/* Right Side Buttons - Netflix Style */}
           <div className="hidden md:flex items-center gap-4">
+<<<<<<< HEAD
             {/* Search Icon */}
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -95,6 +97,8 @@ export default function Navbar() {
               </button>
             </div>
 
+=======
+>>>>>>> origin/refactored-code
             {/* Red Sign In Button Feel */}
             <Link 
               href="/login" 
@@ -150,11 +154,6 @@ export default function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-3 mt-6">
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-black/30 border border-white/20 rounded text-white text-sm font-medium">
-                  <span className="text-xs">文A</span>
-                  English
-                  <span>▼</span>
-                </button>
                 <Link
                   href="/login"
                   className="w-full text-center bg-[#E50914] text-white px-4 py-2.5 rounded font-bold transition-all"

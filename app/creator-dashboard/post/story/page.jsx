@@ -175,16 +175,69 @@ export default function PostStoryPage() {
 
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
-            const { data: { user } } = await supabase.auth.getUser(); // Add this line to avoid Next.js warnings
+            const { data: { user } } = await supabase.auth.getUser();
             const token = session?.access_token;
 
-            const res = await fetch(`${BACKEND_URL}/api/content/stories/upload`, {
-                method: 'POST',
-                headers: {
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
-                body: payload,
-            });
+            let res;
+            try {
+                res = await fetch(`${BACKEND_URL}/api/content/stories/upload`, {
+                    method: 'POST',
+                    headers: {
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: payload,
+                });
+            } catch (fetchErr) {
+                console.warn("[Upload] Backend unreachable, falling back to Supabase direct upload", fetchErr);
+                
+                if (!user) throw new Error("User not authenticated for fallback upload");
+
+                // 1. Upload Media (Audio or Text File)
+                let mediaUrl = null;
+                const fileToUpload = mediaFiles.audio || mediaFiles.text;
+                if (fileToUpload) {
+                    const ext = fileToUpload.name.split('.').pop();
+                    const path = `${user.id}/stories/${Date.now()}.${ext}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('videos')
+                        .upload(path, fileToUpload);
+                    if (uploadError) throw uploadError;
+                    const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(path);
+                    mediaUrl = publicUrl;
+                }
+
+                // 2. Upload Cover
+                let coverUrl = null;
+                if (mediaFiles.cover) {
+                    const ext = mediaFiles.cover.name.split('.').pop();
+                    const path = `${user.id}/covers/${Date.now()}.${ext}`;
+                    const { error: coverError } = await supabase.storage
+                        .from('videos')
+                        .upload(path, mediaFiles.cover);
+                    if (!coverError) {
+                        const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(path);
+                        coverUrl = publicUrl;
+                    }
+                }
+
+                // 3. Insert into database
+                const { error: dbError } = await supabase
+                    .from('content')
+                    .insert({
+                        creator_id: user.id,
+                        title: formData.title,
+                        category: 'story',
+                        description: fullContent,
+                        media_url: mediaUrl,
+                        cover_url: coverUrl,
+                        content_type: contentType,
+                        visibility: 'public',
+                        status: 'approved'
+                    });
+
+                if (dbError) throw dbError;
+                res = { ok: true, json: async () => ({ success: true }) };
+            }
 
             const result = await res.json();
 
@@ -196,7 +249,8 @@ export default function PostStoryPage() {
                 setMessage({ type: 'error', text: result.error || 'Upload failed' });
             }
         } catch (err) {
-            setMessage({ type: 'error', text: 'Network connection error' });
+            console.error("[Upload Error]", err);
+            setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Network connection error' });
         } finally {
             setLoading(false);
         }

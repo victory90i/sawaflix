@@ -15,6 +15,7 @@ import {
   FileText,
   Workflow,
   Wallet,
+  Heart,
 } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '../../utils/supabase/client';
@@ -30,15 +31,19 @@ type UserProfileData = {
 export default function LeftSidebar({ 
   onNavigate, 
   verificationStatus: propStatus,
+  userRole: propUserRole,
   userProfile: propProfile
 }: { 
   onNavigate?: () => void;
   verificationStatus?: string;
+  userRole?: string;
   userProfile?: any;
 }) {
   const pathname = usePathname();
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(propProfile || null);
   const [verificationStatus, setVerificationStatus] = useState<string>(propStatus || 'none');
+  const [userRole, setUserRole] = useState<string | null>(propUserRole || null);
+  const [loading, setLoading] = useState(!propProfile);
 
   // Update local state if props change
   useEffect(() => {
@@ -46,7 +51,14 @@ export default function LeftSidebar({
   }, [propStatus]);
 
   useEffect(() => {
-    if (propProfile) setUserProfile(propProfile);
+    if (propUserRole) setUserRole(propUserRole);
+  }, [propUserRole]);
+
+  useEffect(() => {
+    if (propProfile) {
+      setUserProfile(propProfile);
+      setLoading(false);
+    }
   }, [propProfile]);
 
   // Fallback fetching if props are missing (e.g. standalone usage)
@@ -54,9 +66,10 @@ export default function LeftSidebar({
     if (propStatus && propProfile) return; // Skip if we have props
 
     const fetchUserData = async () => {
+      setLoading(true);
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = session?.user;
 
       if (user && session) {
         if (!propProfile) {
@@ -87,10 +100,11 @@ export default function LeftSidebar({
             }
         }
       }
+      setLoading(false);
     };
 
     fetchUserData();
-  }, [propStatus, propProfile, verificationStatus]);
+  }, [propStatus, propProfile]);
 
   const topItems = [
     { name: 'Home', icon: Home, id: 'feed', route: '/dashboard', badge: null },
@@ -112,36 +126,13 @@ export default function LeftSidebar({
       route: '/dashboard/profile', 
       badge: null 
     },
+    { name: 'Favorites', icon: Heart, id: 'favorites', route: '/dashboard/favorites', badge: null },
     { name: 'Wallet', icon: Wallet, id: 'wallet', route: '/dashboard/wallet', badge: null },
     { name: 'SawaSmart', icon: Workflow, id: 'SawaSmart', route: '/dashboard/sawasmart', badge: null },
   ];
 
-  // Add "Creator Hub" link to "You" section ONLY if NOT approved
-  // If approved, it will have its own section after Explore
-  if (verificationStatus?.toLowerCase() !== 'approved' && !youItems.find(item => item.id === 'create-content')) {
-    let route = '/creator/verify'; // Default apply
-    let badge: string | null = 'Apply';
-
-    if (verificationStatus?.toLowerCase() === 'pending') {
-      route = '/creator/pending';
-      badge = 'Pending';
-    } else if (verificationStatus?.toLowerCase() === 'rejected') {
-      route = '/creator/verify'; // Re-apply
-      badge = 'Apply';
-    }
-
-    youItems.push({
-      name: 'Creator Hub',
-      icon: Workflow,
-      id: 'create-content',
-      route: route,
-      badge: badge
-    });
-  }
-
   const creatorItems = [
     { name: 'Post', icon: LayoutGrid, id: 'post', route: '/creator-dashboard', badge: null },
-    { name: 'Upload New', icon: Upload, id: 'upload', route: '/creator-dashboard/post/upload', badge: null },
     { name: 'My Content', icon: Film, id: 'my-content', route: '/creator-dashboard/content', badge: null },
     { name: 'Analytics', icon: BarChart2, id: 'analytics', route: '/creator-dashboard/analytics', badge: null },
     { name: 'Comments', icon: MessageSquare, id: 'comments', route: '/creator-dashboard/comments', badge: null },
@@ -154,9 +145,15 @@ export default function LeftSidebar({
 
   const renderItem = (item: any) => {
     const Icon = item.icon;
-    const isActive = item.route === '/dashboard' 
-      ? pathname === '/dashboard' 
-      : pathname?.startsWith(item.route);
+    let isActive = false;
+    
+    if (item.route === '/dashboard') {
+      isActive = pathname === '/dashboard';
+    } else if (item.name === 'Music') {
+      isActive = pathname?.toLowerCase().includes('/dashboard/music') || pathname?.toLowerCase().includes('/dashboard/artist');
+    } else {
+      isActive = pathname?.toLowerCase().startsWith(item.route.toLowerCase());
+    }
 
     return (
       <Link
@@ -201,15 +198,6 @@ export default function LeftSidebar({
           {topItems.map(renderItem)}
         </div>
 
-        {/* You Section */}
-        <div className="space-y-1 mb-6">
-          <Link href="/dashboard/profile" onClick={() => onNavigate?.()} className="group flex items-center px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer w-fit mb-2">
-            <span className="text-[13px] font-black uppercase tracking-[0.1em] text-zinc-500 group-hover:text-white transition-colors">You</span>
-            <ChevronRight size={14} className="ml-1 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-          </Link>
-          {youItems.map(renderItem)}
-        </div>
-
         {/* Explore Section */}
         <div className="space-y-1 mb-6">
           <h3 className="px-3 py-2 text-[13px] font-black uppercase tracking-[0.1em] text-zinc-500 mb-2">
@@ -218,13 +206,47 @@ export default function LeftSidebar({
           {exploreItems.map(renderItem)}
         </div>
 
-        {verificationStatus?.toLowerCase() === 'approved' && (
+        {/* You Section */}
+        <div className="space-y-1 mb-6">
+          <Link href="/dashboard/profile" onClick={() => onNavigate?.()} className="group flex items-center px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer w-fit mb-2">
+            <span className="text-[13px] font-black uppercase tracking-[0.1em] text-zinc-500 group-hover:text-white transition-colors">You</span>
+            <ChevronRight size={14} className="ml-1 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+          </Link>
+          {loading ? (
+            <div className="space-y-2 px-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-4 py-2 animate-pulse">
+                  <div className="w-5 h-5 bg-white/5 rounded-full" />
+                  <div className="w-24 h-3 bg-white/5 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            youItems.map(renderItem)
+          )}
+        </div>
+
+        {loading ? (
           <div className="space-y-1 mb-6">
-            <h3 className="px-3 py-2 text-[13px] font-black uppercase tracking-[0.1em] text-zinc-500 mb-2">
-              Creator Hub
-            </h3>
-            {creatorItems.map(renderItem)}
+            <div className="px-3 py-2 w-24 h-3 bg-white/5 rounded mb-4 animate-pulse ml-3" />
+            <div className="space-y-2 px-3">
+              {[1, 2].map(i => (
+                <div key={i} className="flex items-center gap-4 py-2 animate-pulse">
+                  <div className="w-5 h-5 bg-white/5 rounded" />
+                  <div className="w-28 h-3 bg-white/5 rounded" />
+                </div>
+              ))}
+            </div>
           </div>
+        ) : (
+          userRole?.toLowerCase() === 'creator' && (
+            <div className="space-y-1 mb-6">
+              <h3 className="px-3 py-2 text-[13px] font-black uppercase tracking-[0.1em] text-zinc-500 mb-2">
+                Creator Hub
+              </h3>
+              {creatorItems.map(renderItem)}
+            </div>
+          )
         )}
 
 

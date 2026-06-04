@@ -2,6 +2,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from './utils/supabase/middleware'
 
 export default async function middleware(request: NextRequest) {
+  // Skip PWA static files — never redirect these
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname.startsWith('/icons/')
+  ) {
+    return NextResponse.next();
+  }
+
   try {
     return await updateSession(request);
   } catch (error) {
@@ -19,7 +29,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - api/ (API routes)
      * - login (auth pages explicitly ignored by Edge)
+     * - manifest.json, sw.js, icons/ (PWA files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|login|sign-in|sign-up|verify-otp|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|icons|login|sign-in|sign-up|verify-otp|auth/callback|offline|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
   ],
 }

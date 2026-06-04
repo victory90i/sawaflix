@@ -41,6 +41,15 @@ export default function VideoUpload() {
     }
 
     setUploading(true);
+    
+    // File size check (e.g., 100MB limit)
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+    if (file && file.size > MAX_SIZE) {
+      setError(`Video file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed is 100MB.`);
+      setUploading(false);
+      return;
+    }
+
     setProgress(50); // Show partial progress while waiting for backend Cloudinary upload
 
     try {
@@ -48,17 +57,55 @@ export default function VideoUpload() {
       const token = session?.access_token;
       
       // Pass the raw FormData directly to the backend
-      const response = await fetch(`${BACKEND_URL}/api/content/movie/upload`, {
-        method: 'POST',
-        headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData,
-      });
+      let res;
+      try {
+        res = await fetch(`${BACKEND_URL}/api/content/movie/upload`, {
+          method: 'POST',
+          headers: {
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: formData,
+        });
+      } catch (fetchErr) {
+        console.warn("[Upload] Backend unreachable, falling back to Supabase direct upload", fetchErr);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated for fallback upload");
 
-      const result = await response.json();
+        // 1. Upload Video File
+        const ext = file.name.split('.').pop();
+        const path = `${user.id}/movies/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('videos')
+          .upload(path, file);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(path);
 
-      if (!response.ok) {
+        // 2. Insert into movies table
+        const { error: dbError } = await supabase
+          .from('movies')
+          .insert({
+            uploaded_by: user.id,
+            title: title,
+            description: description,
+            video_url: publicUrl,
+            thumbnail: publicUrl.replace(/\.[^/.]+$/, ".jpg"), // Crude thumbnail fallback
+            is_featured: formData.get('is_featured') === 'on',
+            producer_name: (formData.get('producer_name') as string) || null,
+            featured_actors: (formData.get('featured_actors') as string) || null,
+            release_date: (formData.get('release_date') as string) || null,
+            created_at: new Date().toISOString()
+          });
+
+        if (dbError) throw dbError;
+        res = { ok: true, json: async () => ({ success: true }) };
+      }
+
+      const result = await res.json();
+
+      if (!res.ok) {
         throw new Error(result.error || 'Backend failed to upload content to Cloudinary');
       }
 

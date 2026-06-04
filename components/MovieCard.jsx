@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Play, Plus, Info, Star } from 'lucide-react';
+import { Play, Info, Star } from 'lucide-react';
+import FavoriteButton from './common/FavoriteButton';
 
 const MovieCard = ({ movie, isLarge = false, onPlay, onAddToWatchlist, onMoreInfo }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -42,15 +43,10 @@ const MovieCard = ({ movie, isLarge = false, onPlay, onAddToWatchlist, onMoreInf
             >
               <Play size={16} className="md:w-5 md:h-5" fill="currentColor" />
             </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToWatchlist(movie);
-              }}
-              className="bg-gray-800 text-white p-2 md:p-3 rounded-full hover:bg-gray-700 transition-colors"
-            >
-              <Plus size={16} className="md:w-5 md:h-5" />
-            </button>
+            <FavoriteButton 
+              content={movie}
+              className="md:scale-110"
+            />
             <button 
               onClick={(e) => {
                 e.stopPropagation();

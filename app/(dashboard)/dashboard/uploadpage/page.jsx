@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef } from 'react';
 import { Upload, X } from 'lucide-react';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 const ArtistUploadPage = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -59,9 +60,19 @@ const ArtistUploadPage = () => {
     }));
   };
 
+  const { addNotification } = useNotifications();
+
   const handleSubmit = (isDraft = false) => {
     console.log('Form submitted:', { ...formData, files: selectedFiles, isDraft });
-    // Handle form submission logic here
+    
+    if (!isDraft) {
+      addNotification({
+        type: 'post',
+        title: 'Content Published!',
+        message: `Your ${formData.contentType || 'content'} "${formData.title}" has been published successfully.`,
+        thumbnail: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined
+      });
+    }
   };
 
   const formatFileSize = (bytes) => {

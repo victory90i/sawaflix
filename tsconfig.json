@@ -2,8 +2,7 @@
   "compilerOptions": {
     "types": [
       "node",
-      "react",
-      "youtube"
+      "react"
     ],
     "target": "ES2017",
     "lib": [

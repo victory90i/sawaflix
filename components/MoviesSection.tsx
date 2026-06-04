@@ -35,6 +35,7 @@ const movies = [
 ];
 
 export default function MoviesSection() {
+
   return (
     /* FIX: Separated id from className. 
        scroll-mt-20 ensures your fixed navbar doesn't cover the title when you scroll here.
@@ -42,8 +43,8 @@ export default function MoviesSection() {
     <section className="py-20 bg-[#0B0E14] scroll-mt-20" id="movies">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          title="Cultural Movies"
-          subtitle="Immerse yourself in stories told by our ancestors and new generations."
+          title="Featured Movies"
+          subtitle="Explore the latest African cinematic masterpieces and blockbusters"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

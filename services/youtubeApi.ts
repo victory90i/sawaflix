@@ -18,7 +18,7 @@ export class YouTubeApiService {
     async searchVideos(
         query: string,
         pageToken: string | null = null,
-        maxResults: number = 7
+        maxResults: number = 10
     ): Promise<VideoSearchResponse> {
         console.log('[API] Invoking server action to fetch videos for:', query);
         return searchVideosAction(query, pageToken, maxResults);

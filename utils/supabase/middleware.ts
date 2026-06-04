@@ -103,16 +103,17 @@ export async function updateSession(request: NextRequest) {
   // pathname is already extracted above
 
   const publicRoutes = [
-    "/login", 
-    "/sign-up", 
-    "/sign-in", 
-    "/verify-otp", 
-    "/auth/callback", 
-    "/update-password", 
+    "/login",
+    "/sign-up",
+    "/sign-in",
+    "/verify-otp",
+    "/auth/callback",
+    "/update-password",
     "/forgot-password",
     "/dashboard/blogs",
     "/artistpage",
-    "/home"
+    "/home",
+    "/waiting-list"
   ];
   const authRoutes = ["/login", "/sign-up", "/sign-in", "/auth/callback"];
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
@@ -122,9 +123,9 @@ export async function updateSession(request: NextRequest) {
   const redirectWithCookies = (url: URL | string) => {
     const targetUrl = new URL(url, request.url);
     const redirectResponse = NextResponse.redirect(targetUrl);
-    
+
     copySetCookies(supabaseResponse, redirectResponse)
-    
+
     if (isDev) console.log(`Middleware Redirecting to ${url} from ${pathname}`);
     return redirectResponse;
   };
@@ -146,13 +147,13 @@ export async function updateSession(request: NextRequest) {
   try {
     const { data: profileData, error: profileError } = await supabase
       .from("users")
-      .select("id, role, verification_status")
+      .select("id, role, verification_status, isAuthorize")
       .eq("id", user.id)
       .maybeSingle();
-      
+
     if (profileError) console.error('Middleware profile fetch error:', profileError);
     profile = profileData;
-    
+
     // We need to fetch submissions for all users because viewers can submit verification applications
     const { data: submissionData } = await supabase
       .from("verification_submissions")
@@ -160,14 +161,14 @@ export async function updateSession(request: NextRequest) {
       .eq("creator_id", user.id)
       .maybeSingle();
     submission = submissionData;
-    
+
     if (profile?.role === 'admin') {
-        isApprovedCreator = true;
+      isApprovedCreator = true;
     } else {
-        isApprovedCreator = (
-            submission?.status?.toLowerCase() === 'approved' || 
-            profile?.verification_status?.toLowerCase() === 'approved'
-        );
+      isApprovedCreator = (
+        submission?.status?.toLowerCase() === 'approved' ||
+        profile?.verification_status?.toLowerCase() === 'approved'
+      );
     }
   } catch (err) {
     console.error("Middleware DB Fetch issue:", err);
@@ -177,13 +178,13 @@ export async function updateSession(request: NextRequest) {
   // We removed pathname === '/' from here to allow users to see the landing page first
   if (isAuthRoute) {
     const role = profile?.role || 'client';
-    
+
     // Default target for everyone (including creators) is the main feed
     let target = "/dashboard";
-    
+
     // Admins go to their specific portal
     if (role === 'admin') target = "/admin";
-    
+
     if (isDev) console.log(`Auth route ${pathname}. Logged in as ${role}. Redirecting to ${target}`);
     return redirectWithCookies(target);
   }
@@ -197,33 +198,46 @@ export async function updateSession(request: NextRequest) {
   // but are waiting for admin approval (for creators).
   const isOAuthUser = user?.app_metadata?.provider && user.app_metadata.provider !== 'email';
   const isVerified = profile.verification_status === "approved" || profile.verification_status === "pending";
-  
+
   if (profile.role !== 'admin' && !isOAuthUser && !isVerified) {
-      if (isPublicRoute) return supabaseResponse;
-      if (pathname.startsWith("/creator/verify")) return supabaseResponse;
-      if (pathname.startsWith("/creator/pending")) return supabaseResponse;
-      
-      return redirectWithCookies("/verify-otp");
+    if (isPublicRoute) return supabaseResponse;
+    if (pathname.startsWith("/creator/verify")) return supabaseResponse;
+    if (pathname.startsWith("/creator/pending")) return supabaseResponse;
+
+    return redirectWithCookies("/verify-otp");
   }
 
-  // 6. Access Control for /creator-dashboard
+  // 6. isAuthorize Check
+  // If user is not an admin and isAuthorize is false, redirect to /waiting-list
+  if (profile.role !== 'admin' && profile.isAuthorize === false) {
+    if (pathname !== '/waiting-list' && !isPublicRoute) {
+      return redirectWithCookies("/waiting-list");
+    }
+  }
+
+  // If user is authorized but on waiting-list, redirect to dashboard
+  if (profile.isAuthorize === true && pathname === '/waiting-list') {
+    return redirectWithCookies("/dashboard");
+  }
+
+  // 7. Access Control for /creator-dashboard
   if (pathname.startsWith("/creator-dashboard")) {
-     if (!isApprovedCreator) {
-        return redirectWithCookies("/dashboard");
-     }
+    if (!isApprovedCreator) {
+      return redirectWithCookies("/dashboard");
+    }
   }
 
   // 7. Access Control for /creator/ (Verify/Pending)
   if (pathname.startsWith("/creator/")) {
-     if (isApprovedCreator) {
-       return redirectWithCookies("/creator-dashboard");
-     }
-     
-     if (pathname === "/creator/pending") {
-       if (!submission || (submission.status !== "pending" && submission.status !== "approved")) {
-          return redirectWithCookies("/creator/verify");
-       }
-     }
+    if (isApprovedCreator) {
+      return redirectWithCookies("/creator-dashboard");
+    }
+
+    if (pathname === "/creator/pending") {
+      if (!submission || (submission.status !== "pending" && submission.status !== "approved")) {
+        return redirectWithCookies("/creator/verify");
+      }
+    }
   }
 
   return supabaseResponse;

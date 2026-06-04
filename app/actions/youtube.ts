@@ -47,41 +47,66 @@ const MOCK_VIDEOS: Video[] = [
 /**
  * Robust fetch with timeout and better error handling
  */
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 60000) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 60000, retries = 2) {
+    let lastError: any;
+    
+    for (let i = 0; i <= retries; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        return response;
-    } catch (error: any) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            console.warn(`[YouTube Action] Request timed out for: ${url}`);
-            throw new Error('Backend request timed out. The server might be waking up (Render free tier). Please wait a moment and try again.');
-        }
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+            lastError = error;
 
-        // Handle low-level connection failures
-        if (error.message === 'fetch failed' || error.code === 'ECONNREFUSED' || error.code === 'UND_ERR_CONNECT_TIMEOUT') {
-            console.error(`[YouTube Action] Connection failed to: ${url}`, error);
+            const isRetryable = 
+                error.code === 'ECONNRESET' || 
+                error.message?.includes('ECONNRESET') ||
+                error.code === 'ETIMEDOUT' ||
+                error.name === 'AbortError';
+
+            if (isRetryable && i < retries) {
+                const delay = Math.pow(2, i) * 1000;
+                console.warn(`[YouTube Action] Fetch failed (${error.code || error.name}). Retrying in ${delay}ms... (${i + 1}/${retries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
             
-            const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
-            const message = isLocal 
-                ? 'Unable to connect to your local SawaFlix backend. Please ensure it is running on http://localhost:5000'
-                : 'Unable to reach the SawaFlix backend. It might be offline or waking up.';
-            
-            const err = new Error(message) as any;
-            err.code = 'BACKEND_UNREACHABLE';
-            throw err;
-        }
+            if (error.name === 'AbortError') {
+                console.warn(`[YouTube Action] Request timed out for: ${url}`);
+                throw new Error('Backend request timed out. The server might be waking up (Render free tier). Please wait a moment and try again.');
+            }
 
-        throw error;
+            // Handle low-level connection failures
+            if (
+                error.message === 'fetch failed' || 
+                error.code === 'ECONNREFUSED' || 
+                error.code === 'ECONNRESET' ||
+                error.message?.includes('ECONNRESET') ||
+                error.code === 'UND_ERR_CONNECT_TIMEOUT'
+            ) {
+                console.error(`[YouTube Action] Connection failed to: ${url}`, error.message);
+                
+                const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
+                const message = isLocal 
+                    ? 'Unable to connect to your local SawaFlix backend. Please ensure it is running on http://localhost:5000'
+                    : 'Unable to reach the SawaFlix backend. It might be offline or waking up.';
+                
+                const err = new Error(message) as any;
+                err.code = 'BACKEND_UNREACHABLE';
+                throw err;
+            }
+
+            throw error;
+        }
     }
+    throw lastError;
 }
 
 async function handleResponse(response: Response) {
